@@ -1,56 +1,45 @@
 import streamlit as st
-from openai import OpenAI
+from api.search_api import ingest_document, search
+from api.chat_api import get_openai_client, chat_completion
 
-# Show title and description.
-st.title("💬 Chatbot")
-st.write(
-    "This is a simple chatbot that uses OpenAI's GPT-3.5 model to generate responses. "
-    "To use this app, you need to provide an OpenAI API key, which you can get [here](https://platform.openai.com/account/api-keys). "
-    "You can also learn how to build this app step by step by [following our tutorial](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)."
-)
-
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
+# App title and OpenAI API key input
+st.title("Interview-Genie")
 openai_api_key = st.text_input("OpenAI API Key", type="password")
+
 if not openai_api_key:
     st.info("Please add your OpenAI API key to continue.", icon="🗝️")
 else:
-
-    # Create an OpenAI client.
-    client = OpenAI(api_key=openai_api_key)
-
-    # Create a session state variable to store the chat messages. This ensures that the
-    # messages persist across reruns.
+    # Initialize OpenAI client
+    client = get_openai_client(openai_api_key)
+    
+    # Initialize session state
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Display the existing chat messages via `st.chat_message`.
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    # Document Upload Section
+    st.write("### Upload Documents for Reference")
+    uploaded_files = st.file_uploader("Upload PDF or text documents", accept_multiple_files=True)
+    if uploaded_files:
+        for file in uploaded_files:
+            doc_id = file.name
+            text = file.read().decode("utf-8")
+            st.write(ingest_document(doc_id, text))
 
-    # Create a chat input field to allow the user to enter a message. This will display
-    # automatically at the bottom of the page.
-    if prompt := st.chat_input("What is up?"):
-
-        # Store and display the current prompt.
+    # Chat Interface
+    st.write("### Chat with Interview-Genie")
+    if prompt := st.chat_input("Ask a question..."):
+        # Display user prompt
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Generate a response using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            stream=True,
-        )
+        # Retrieve relevant context from search API
+        context = search(prompt)
 
-        # Stream the response to the chat using `st.write_stream`, then store it in 
-        # session state.
+        # Generate response with chat completion API
+        response = chat_completion(client, prompt, context, st.session_state.messages)
+        
+        # Display assistant response
         with st.chat_message("assistant"):
-            response = st.write_stream(stream)
+            st.markdown(response)
         st.session_state.messages.append({"role": "assistant", "content": response})
