@@ -22,7 +22,12 @@ else:
     if uploaded_files:
         for file in uploaded_files:
             doc_id = file.name
-            text = file.read().decode("utf-8")
+            # Try reading the file with UTF-8 encoding; fallback to Latin-1 if it fails
+            try:
+                text = file.read().decode("utf-8")
+            except UnicodeDecodeError:
+                text = file.read().decode("latin-1")  # Fallback for non-UTF-8 files
+
             st.write(ingest_document(doc_id, text))
 
     # Chat Interface
