@@ -1,6 +1,6 @@
 import streamlit as st
-from api.search_api import ingest_document, search
-from api.chat_api import get_openai_client, chat_completion
+from api.search_api.app import ingest_document, search
+from api.chat_api.app import get_openai_client, chat_completion
 
 # App title and OpenAI API key input
 st.title("Interview-Genie")
